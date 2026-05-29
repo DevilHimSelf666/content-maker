@@ -11,19 +11,8 @@ public sealed class OpenAiCompatibleLlmClient(HttpClient httpClient, IOptions<Ll
 {
     private readonly LlmOptions _options = options.Value;
 
-    public async Task<VideoClassification> ClassifyAsync(string title, string? description, string transcript, CancellationToken cancellationToken)
+    public async Task<VideoClassification> ClassifyAsync(string prompt, CancellationToken cancellationToken)
     {
-        var prompt = $"""
-        You evaluate software engineering videos for Persian enterprise developers.
-        Return JSON only: {{"isRelevant": true|false, "score": 0.0-1.0, "reason": "short English reason"}}.
-        High value topics: .NET, ASP.NET Core, Blazor, EF Core, SQL Server, Clean Architecture, DDD, CQRS, Wolverine, DevOps, observability, security, AI engineering, RAG, system design.
-        Low value: drama, hype, sponsorship, product marketing, shallow opinions.
-
-        Title: {title}
-        Description: {description}
-        Transcript: {transcript[..Math.Min(transcript.Length, 8000)]}
-        """;
-
         var content = await CompleteAsync(prompt, cancellationToken);
         using var doc = JsonDocument.Parse(content);
         var root = doc.RootElement;
@@ -33,27 +22,28 @@ public sealed class OpenAiCompatibleLlmClient(HttpClient httpClient, IOptions<Ll
             root.GetProperty("reason").GetString() ?? string.Empty);
     }
 
-    public async Task<GeneratedArticle> GenerateArticleAsync(string title, string? description, string transcript, CancellationToken cancellationToken)
+    public async Task<GeneratedArticle> GenerateArticleAsync(string prompt, CancellationToken cancellationToken)
     {
-        var prompt = $"""
-        Write a practical Persian technical article for professional .NET, ASP.NET Core, Blazor, backend, architecture, and DevOps engineers.
-        Keep technical terms in English. Avoid hype, clickbait, repetition, and unsupported claims.
-        The article must be educational and actionable, not a summary.
-        Return JSON only: {{"title":"Persian title","summary":"short Persian summary","contentMarkdown":"markdown article"}}.
-        Required sections: Title, Introduction, Problem Statement, Technical Explanation, Enterprise Usage, Common Mistakes, Team Recommendations, Conclusion.
-
-        Video title: {title}
-        Description: {description}
-        Transcript: {transcript[..Math.Min(transcript.Length, 12000)]}
-        """;
-
         var content = await CompleteAsync(prompt, cancellationToken);
         using var doc = JsonDocument.Parse(content);
         var root = doc.RootElement;
         return new GeneratedArticle(
-            root.GetProperty("title").GetString() ?? title,
+            root.GetProperty("title").GetString() ?? string.Empty,
             root.GetProperty("contentMarkdown").GetString() ?? string.Empty,
             root.GetProperty("summary").GetString());
+    }
+
+    public async Task<ArticleQualityScore> ScoreArticleAsync(string prompt, CancellationToken cancellationToken)
+    {
+        var content = await CompleteAsync(prompt, cancellationToken);
+        using var doc = JsonDocument.Parse(content);
+        var root = doc.RootElement;
+        return new ArticleQualityScore(
+            root.GetProperty("technicalDepth").GetDecimal(),
+            root.GetProperty("relevance").GetDecimal(),
+            root.GetProperty("readability").GetDecimal(),
+            root.GetProperty("practicalValue").GetDecimal(),
+            root.GetProperty("reason").GetString() ?? string.Empty);
     }
 
     private async Task<string> CompleteAsync(string userPrompt, CancellationToken cancellationToken)

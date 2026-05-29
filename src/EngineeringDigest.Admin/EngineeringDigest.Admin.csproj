@@ -2,5 +2,10 @@
   <ItemGroup>
     <ProjectReference Include="..\EngineeringDigest.Infrastructure\EngineeringDigest.Infrastructure.csproj" />
     <PackageReference Include="WolverineFx" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
   </ItemGroup>
 </Project>

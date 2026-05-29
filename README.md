@@ -136,3 +136,18 @@ dotnet build EngineeringDigest.sln
 dotnet test EngineeringDigest.sln
 docker compose up --build
 ```
+
+
+## Phase 2 Production Readiness
+
+Phase 2 adds durable Wolverine messaging, SQL Server persisted inbox/outbox, retry policies with exponential backoff, processing job tracking, Serilog structured logs, OpenTelemetry metrics/tracing, health/readiness endpoints, editable prompt templates, article version history, article quality scoring, Telegram preview/splitting, role-based authorization, audit trails, and scheduled cleanup jobs.
+
+### Operations
+
+- Health: `GET /health`
+- Readiness: `GET /ready`
+- Admin pages: `/jobs`, `/prompts`, `/audit`, `/articles`, `/videos`
+- Roles: `Reader`, `Reviewer`, `Publisher`, `Administrator`
+- Trusted proxy headers for internal auth: `X-User-Name`, `X-User-Roles`
+
+See `ARCHITECTURE.md` and `RUNBOOK.md` for production details.

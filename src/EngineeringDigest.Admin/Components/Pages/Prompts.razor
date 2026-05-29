@@ -1,0 +1,79 @@
+@page "/prompts"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@inject EngineeringDigestDbContext Db
+
+<h1>Prompt Templates</h1>
+<p>Prompts are versioned. Create a new version instead of overwriting the active production prompt when changing behavior.</p>
+
+@if (editing is not null)
+{
+    <section class="card">
+        <label>Name <input @bind="editing.Name" /></label>
+        <label>Kind <select @bind="editing.Kind">
+            @foreach (var kind in Enum.GetValues<PromptTemplateKind>())
+            {
+                <option value="@kind">@kind</option>
+            }
+        </select></label>
+        <label>Version <input type="number" @bind="editing.Version" /></label>
+        <label>Active <input type="checkbox" @bind="editing.IsActive" /></label>
+        <textarea rows="18" @bind="editing.Template"></textarea>
+        <button @onclick="Save">Save</button>
+        <button class="secondary" @onclick="NewVersion">New version from current</button>
+    </section>
+}
+
+@foreach (var prompt in prompts)
+{
+    <article class="card">
+        <h2>@prompt.Kind v@prompt.Version · @prompt.Name</h2>
+        <p><span class="badge">@(prompt.IsActive ? "Active" : "Inactive")</span></p>
+        <button @onclick="() => Edit(prompt.Id)">Edit</button>
+        <pre>@prompt.Template</pre>
+    </article>
+}
+
+@code {
+    private List<EngineeringDigest.Domain.Entities.PromptTemplate> prompts = [];
+    private EngineeringDigest.Domain.Entities.PromptTemplate? editing;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        prompts = await Db.PromptTemplates.OrderBy(x => x.Kind).ThenByDescending(x => x.Version).ToListAsync();
+        editing ??= prompts.FirstOrDefault();
+    }
+
+    private async Task Edit(Guid id)
+    {
+        editing = await Db.PromptTemplates.FirstAsync(x => x.Id == id);
+    }
+
+    private void NewVersion()
+    {
+        if (editing is null) return;
+        editing = new EngineeringDigest.Domain.Entities.PromptTemplate
+        {
+            Kind = editing.Kind,
+            Name = editing.Name,
+            Version = prompts.Where(x => x.Kind == editing.Kind).Select(x => x.Version).DefaultIfEmpty(0).Max() + 1,
+            Template = editing.Template,
+            IsActive = false
+        };
+        Db.PromptTemplates.Add(editing);
+    }
+
+    private async Task Save()
+    {
+        if (editing is null) return;
+        if (editing.IsActive)
+        {
+            await Db.PromptTemplates.Where(x => x.Kind == editing.Kind && x.Id != editing.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.IsActive, false));
+        }
+        await Db.SaveChangesAsync();
+        editing = null;
+        await LoadAsync();
+    }
+}

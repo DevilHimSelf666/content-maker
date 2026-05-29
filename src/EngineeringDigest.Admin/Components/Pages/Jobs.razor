@@ -1,0 +1,30 @@
+@page "/jobs"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Reader,Reviewer,Publisher,Administrator")]
+@rendermode InteractiveServer
+@inject EngineeringDigestDbContext Db
+
+<h1>Processing Jobs</h1>
+<table>
+    <thead><tr><th>Type</th><th>Status</th><th>Started</th><th>Completed</th><th>Duration</th><th>Failure</th></tr></thead>
+    <tbody>
+    @foreach (var job in jobs)
+    {
+        <tr>
+            <td>@job.JobType</td>
+            <td><span class="badge">@job.Status</span></td>
+            <td>@job.StartedAt.UtcDateTime.ToString("u")</td>
+            <td>@job.CompletedAt?.UtcDateTime.ToString("u")</td>
+            <td>@job.DurationMilliseconds ms</td>
+            <td>@job.FailureReason</td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+@code {
+    private List<EngineeringDigest.Domain.Entities.ProcessingJob> jobs = [];
+    protected override async Task OnInitializedAsync()
+    {
+        jobs = await Db.ProcessingJobs.AsNoTracking().OrderByDescending(x => x.StartedAt).Take(200).ToListAsync();
+    }
+}
