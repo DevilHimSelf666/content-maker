@@ -1,0 +1,23 @@
+@page "/audit"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@inject EngineeringDigestDbContext Db
+
+<h1>Audit Trail</h1>
+<table>
+    <thead><tr><th>When</th><th>Actor</th><th>Entity</th><th>Action</th><th>Details</th></tr></thead>
+    <tbody>
+    @foreach (var item in auditItems)
+    {
+        <tr><td>@item.OccurredAt.UtcDateTime.ToString("u")</td><td>@item.Actor</td><td>@item.EntityName @item.EntityId</td><td>@item.Action</td><td>@item.Details</td></tr>
+    }
+    </tbody>
+</table>
+
+@code {
+    private List<EngineeringDigest.Domain.Entities.AuditTrail> auditItems = [];
+    protected override async Task OnInitializedAsync()
+    {
+        auditItems = await Db.AuditTrails.AsNoTracking().OrderByDescending(x => x.OccurredAt).Take(200).ToListAsync();
+    }
+}

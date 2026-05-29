@@ -138,33 +138,16 @@ docker compose up --build
 ```
 
 
-## Phase 3 Knowledge Platform
+## Phase 2 Production Readiness
 
-Engineering Digest now includes a Knowledge Platform that turns approved Persian engineering articles into a searchable internal learning base.
+Phase 2 adds durable Wolverine messaging, SQL Server persisted inbox/outbox, retry policies with exponential backoff, processing job tracking, Serilog structured logs, OpenTelemetry metrics/tracing, health/readiness endpoints, editable prompt templates, article version history, article quality scoring, Telegram preview/splitting, role-based authorization, audit trails, and scheduled cleanup jobs.
 
-### Capabilities
+### Operations
 
-- Approved articles are promoted to `KnowledgeArticle` records.
-- PostgreSQL + pgvector stores title, body, and key-takeaway embeddings.
-- `IEmbeddingProvider` supports OpenAI, OpenAI-compatible, and local embedding endpoints through configuration.
-- `/knowledge` provides full-text and semantic search with category filters.
-- `/knowledge/ask` provides RAG answers with cited source articles and confidence scores.
-- Related articles, learning paths, weekly digests, analytics dashboards, quality scores, and Markdown/HTML/PDF export endpoints are scaffolded for internal learning workflows.
+- Health: `GET /health`
+- Readiness: `GET /ready`
+- Admin pages: `/jobs`, `/prompts`, `/audit`, `/articles`, `/videos`
+- Roles: `Reader`, `Reviewer`, `Publisher`, `Administrator`
+- Trusted proxy headers for internal auth: `X-User-Name`, `X-User-Roles`
 
-### Knowledge API
-
-- `GET /knowledge/search?q=...&semantic=true`
-- `GET /knowledge/article/{id}`
-- `GET /knowledge/related/{id}`
-- `POST /knowledge/ask`
-- `GET /knowledge/article/{id}/export/{format}` where format is `markdown`, `html`, or `pdf`
-
-### Configuration
-
-Set `ConnectionStrings:Knowledge` to PostgreSQL with pgvector enabled and configure the `Embedding` section. Models are never hardcoded.
-
-See also:
-
-- `docs/RAG.md`
-- `docs/KNOWLEDGE_PLATFORM.md`
-- `docs/SEARCH_ARCHITECTURE.md`
+See `ARCHITECTURE.md` and `RUNBOOK.md` for production details.

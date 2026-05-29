@@ -1,14 +1,18 @@
 using EngineeringDigest.Application.Abstractions;
-using EngineeringDigest.Application.Knowledge;
-using EngineeringDigest.Infrastructure.Knowledge;
+using EngineeringDigest.Infrastructure.Articles;
+using EngineeringDigest.Infrastructure.Health;
 using EngineeringDigest.Infrastructure.Llm;
 using EngineeringDigest.Infrastructure.Persistence;
+using EngineeringDigest.Infrastructure.Prompts;
+using EngineeringDigest.Infrastructure.Observability;
 using EngineeringDigest.Infrastructure.Telegram;
 using EngineeringDigest.Infrastructure.Transcripts;
 using EngineeringDigest.Infrastructure.YouTube;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Polly;
+using Polly.Extensions.Http;
 
 namespace EngineeringDigest.Infrastructure.DependencyInjection;
 
@@ -35,26 +39,39 @@ public static class ServiceCollectionExtensions
             options.UseNpgsql(knowledgeConnectionString));
 
         services.AddScoped<DbInitializer>();
-        services.AddHttpClient<IYouTubeRssClient, YouTubeRssClient>();
+        services.AddSingleton<EngineeringDigestMetrics>();
+        services.AddScoped<IPromptTemplateProvider, PromptTemplateProvider>();
+        services.AddScoped<IArticleQualityScorer, LlmArticleQualityScorer>();
+        services.AddHttpClient<IYouTubeRssClient, YouTubeRssClient>()
+            .AddPolicyHandler(GetRetryPolicy());
         services.AddHttpClient<ITranscriptClient, TranscriptClient>((provider, client) =>
         {
             var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranscriptOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl);
-        });
+        }).AddPolicyHandler(GetRetryPolicy());
         services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>((provider, client) =>
         {
             var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<LlmOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/'));
-        });
-        services.AddHttpClient<IEmbeddingProvider, OpenAiCompatibleEmbeddingProvider>((provider, client) =>
-        {
-            var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<EmbeddingOptions>>().Value;
-            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/'));
-        });
-        services.AddScoped<IKnowledgeService, KnowledgeService>();
-        services.AddScoped<IRagService, RagService>();
-        services.AddHttpClient<ITelegramPublisher, TelegramPublisher>();
+        }).AddPolicyHandler(GetRetryPolicy());
+        services.AddHttpClient<ITelegramPublisher, TelegramPublisher>()
+            .AddPolicyHandler(GetRetryPolicy());
+
+        services.AddHttpClient<TranscriptServiceHealthCheck>();
+        services.AddHttpClient<LlmProviderHealthCheck>();
+        services.AddHealthChecks()
+            .AddCheck<SqlServerHealthCheck>("sqlserver")
+            .AddCheck<TranscriptServiceHealthCheck>("transcript-service")
+            .AddCheck<LlmProviderHealthCheck>("llm-provider");
 
         return services;
     }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
+        HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .Or<TaskCanceledException>()
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 }

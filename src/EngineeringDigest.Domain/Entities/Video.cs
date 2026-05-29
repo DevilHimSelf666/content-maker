@@ -19,6 +19,7 @@ public sealed class Video : AuditableEntity
     public decimal? RelevanceScore { get; set; }
     public string? FailureReason { get; set; }
     public Article? Article { get; set; }
+    public ICollection<ProcessingJob> ProcessingJobs { get; set; } = new List<ProcessingJob>();
 
     public void MarkTranscriptReady(string transcript)
     {
@@ -38,6 +39,13 @@ public sealed class Video : AuditableEntity
         RelevanceScore = Math.Clamp(score, 0, 1);
         ClassificationReason = reason.Trim();
         WorkflowStatus = isRelevant ? VideoWorkflowStatus.Classified : VideoWorkflowStatus.NotRelevant;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void MarkFailed(string reason)
+    {
+        FailureReason = reason.Length > 4000 ? reason[..4000] : reason;
+        WorkflowStatus = VideoWorkflowStatus.Failed;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
