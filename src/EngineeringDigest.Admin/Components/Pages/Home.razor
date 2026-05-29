@@ -1,0 +1,32 @@
+@page "/"
+@rendermode InteractiveServer
+@inject EngineeringDigestDbContext Db
+@inject IMessageBus Bus
+
+<h1>Engineering Digest Admin</h1>
+<div class="card">
+    <p>Phase 1 MVP review console. Articles are never auto-published; approve and publish manually from the Articles page.</p>
+    <button @onclick="DiscoverNow">Discover videos now</button>
+</div>
+<div class="card">
+    <strong>@videoCount</strong> videos · <strong>@pendingCount</strong> pending review articles
+</div>
+
+@code {
+    private int videoCount;
+    private int pendingCount;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task DiscoverNow()
+    {
+        await Bus.PublishAsync(new EngineeringDigest.Application.Messaging.DiscoverVideos());
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        videoCount = await Db.Videos.CountAsync();
+        pendingCount = await Db.Articles.CountAsync(x => x.Status == ArticleStatus.PendingReview);
+    }
+}

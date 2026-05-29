@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\EngineeringDigest.Infrastructure\EngineeringDigest.Infrastructure.csproj" />
+    <PackageReference Include="WolverineFx" />
+  </ItemGroup>
+</Project>

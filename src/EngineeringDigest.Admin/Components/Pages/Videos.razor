@@ -1,0 +1,45 @@
+@page "/videos"
+@rendermode InteractiveServer
+@inject EngineeringDigestDbContext Db
+@inject IMessageBus Bus
+
+<h1>Videos</h1>
+<table>
+    <thead>
+        <tr><th>Title</th><th>YouTube Id</th><th>Status</th><th>Published</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+    @foreach (var video in videos)
+    {
+        <tr>
+            <td><a href="@video.Url" target="_blank">@video.Title</a></td>
+            <td>@video.YouTubeVideoId</td>
+            <td><span class="badge">@video.WorkflowStatus</span></td>
+            <td>@video.PublishedAt.UtcDateTime.ToString("u")</td>
+            <td>
+                <button class="secondary" @onclick="() => Extract(video.Id)">Extract transcript</button>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+@code {
+    private List<EngineeringDigest.Domain.Entities.Video> videos = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task Extract(Guid videoId)
+    {
+        await Bus.PublishAsync(new EngineeringDigest.Application.Messaging.ExtractTranscript(videoId));
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        videos = await Db.Videos.AsNoTracking()
+            .OrderByDescending(x => x.PublishedAt)
+            .Take(100)
+            .ToListAsync();
+    }
+}
