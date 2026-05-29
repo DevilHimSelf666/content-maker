@@ -14,8 +14,29 @@ public sealed class Article : AuditableEntity
     public DateTimeOffset? ApprovedAt { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
     public string? TelegramMessageId { get; set; }
+    public decimal? QualityScore { get; set; }
+    public decimal? TechnicalDepthScore { get; set; }
+    public decimal? RelevanceScore { get; set; }
+    public decimal? ReadabilityScore { get; set; }
+    public decimal? PracticalValueScore { get; set; }
+    public int? PromptVersion { get; set; }
+    public string? ApprovedBy { get; set; }
+    public string? RejectedBy { get; set; }
+    public DateTimeOffset? RejectedAt { get; set; }
+    public string? PublishedBy { get; set; }
+    public ICollection<ArticleVersion> Versions { get; set; } = new List<ArticleVersion>();
 
-    public void Approve()
+    public void ApplyQualityScore(decimal technicalDepth, decimal relevance, decimal readability, decimal practicalValue)
+    {
+        TechnicalDepthScore = ClampScore(technicalDepth);
+        RelevanceScore = ClampScore(relevance);
+        ReadabilityScore = ClampScore(readability);
+        PracticalValueScore = ClampScore(practicalValue);
+        QualityScore = Math.Round((TechnicalDepthScore.Value + RelevanceScore.Value + ReadabilityScore.Value + PracticalValueScore.Value) / 4, 2);
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Approve(string? actor = null)
     {
         if (Status == ArticleStatus.Published)
         {
@@ -24,10 +45,24 @@ public sealed class Article : AuditableEntity
 
         Status = ArticleStatus.Approved;
         ApprovedAt ??= DateTimeOffset.UtcNow;
+        ApprovedBy ??= actor;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    public void MarkPublished(string messageId)
+    public void Reject(string? actor = null)
+    {
+        if (Status == ArticleStatus.Published)
+        {
+            throw new InvalidOperationException("Published articles cannot be rejected.");
+        }
+
+        Status = ArticleStatus.Rejected;
+        RejectedAt ??= DateTimeOffset.UtcNow;
+        RejectedBy ??= actor;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void MarkPublished(string messageId, string? actor = null)
     {
         if (Status != ArticleStatus.Approved && Status != ArticleStatus.Published)
         {
@@ -37,6 +72,9 @@ public sealed class Article : AuditableEntity
         Status = ArticleStatus.Published;
         TelegramMessageId = messageId;
         PublishedAt ??= DateTimeOffset.UtcNow;
+        PublishedBy ??= actor;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
+
+    private static decimal ClampScore(decimal value) => Math.Clamp(value, 0m, 10m);
 }

@@ -1,7 +1,10 @@
 @page "/articles"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Reader,Reviewer,Publisher,Administrator")]
 @rendermode InteractiveServer
 @inject EngineeringDigestDbContext Db
 @inject IMessageBus Bus
+@inject EngineeringDigest.Application.Abstractions.ITelegramPublisher TelegramPublisher
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthStateProvider
 
 <h1>Articles</h1>
 @foreach (var article in articles)
@@ -9,19 +12,40 @@
     <article class="card">
         <h2>@article.Title</h2>
         <p><span class="badge">@article.Status</span> · @article.Video?.Title</p>
+        <p>Quality: <strong>@article.QualityScore</strong>/10 · Technical depth @article.TechnicalDepthScore · Relevance @article.RelevanceScore · Readability @article.ReadabilityScore · Practical value @article.PracticalValueScore</p>
         <p>@article.Summary</p>
         <details>
             <summary>Preview markdown</summary>
             <pre>@article.ContentMarkdown</pre>
         </details>
-        @if (article.Status == ArticleStatus.PendingReview)
-        {
-            <button @onclick="() => Approve(article.Id)">Approve</button>
-        }
-        @if (article.Status == ArticleStatus.Approved)
-        {
-            <button @onclick="() => Publish(article.Id)">Publish to Telegram</button>
-        }
+        <details>
+            <summary>Telegram publication preview</summary>
+            <pre>@TelegramPublisher.CreatePreview(article.Title, article.ContentMarkdown)</pre>
+        </details>
+        <details>
+            <summary>Versions (@article.Versions.Count)</summary>
+            @foreach (var version in article.Versions.OrderByDescending(x => x.VersionNumber))
+            {
+                <section class="card">
+                    <strong>Version @version.VersionNumber</strong> · Prompt v@version.PromptVersion · @version.GeneratedAt.UtcDateTime.ToString("u") · Quality @version.QualityScore
+                    <pre>@version.Content</pre>
+                </section>
+            }
+        </details>
+        <AuthorizeView Roles="Reviewer,Administrator">
+            @if (article.Status == ArticleStatus.PendingReview)
+            {
+                <button @onclick="() => Approve(article.Id)">Approve</button>
+                <button class="secondary" @onclick="() => Reject(article.Id)">Reject</button>
+            }
+            <button class="secondary" @onclick="() => Regenerate(article.Id)">Regenerate</button>
+        </AuthorizeView>
+        <AuthorizeView Roles="Publisher,Administrator">
+            @if (article.Status == ArticleStatus.Approved)
+            {
+                <button @onclick="() => Publish(article.Id)">Publish to Telegram</button>
+            }
+        </AuthorizeView>
     </article>
 }
 
@@ -32,20 +56,39 @@
 
     private async Task Approve(Guid articleId)
     {
-        await Bus.PublishAsync(new EngineeringDigest.Application.Messaging.ApproveArticle(articleId));
+        await Bus.PublishAsync(new EngineeringDigest.Application.Messaging.ApproveArticle(articleId, await ActorAsync()));
+        await LoadAsync();
+    }
+
+    private async Task Reject(Guid articleId)
+    {
+        await Bus.PublishAsync(new EngineeringDigest.Application.Messaging.RejectArticle(articleId, await ActorAsync()));
         await LoadAsync();
     }
 
     private async Task Publish(Guid articleId)
     {
-        await Bus.PublishAsync(new EngineeringDigest.Application.Messaging.PublishArticle(articleId));
+        await Bus.PublishAsync(new EngineeringDigest.Application.Messaging.PublishArticle(articleId, await ActorAsync()));
         await LoadAsync();
+    }
+
+    private async Task Regenerate(Guid articleId)
+    {
+        await Bus.PublishAsync(new EngineeringDigest.Application.Messaging.RegenerateArticle(articleId));
+        await LoadAsync();
+    }
+
+    private async Task<string?> ActorAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        return state.User.Identity?.Name;
     }
 
     private async Task LoadAsync()
     {
         articles = await Db.Articles.AsNoTracking()
             .Include(x => x.Video)
+            .Include(x => x.Versions)
             .OrderByDescending(x => x.CreatedAt)
             .Take(100)
             .ToListAsync();
