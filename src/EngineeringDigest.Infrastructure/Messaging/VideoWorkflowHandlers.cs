@@ -1,5 +1,6 @@
 using EngineeringDigest.Application.Abstractions;
 using EngineeringDigest.Application.Messaging;
+using EngineeringDigest.Application.Knowledge;
 using EngineeringDigest.Domain.Entities;
 using EngineeringDigest.Domain.Enums;
 using EngineeringDigest.Infrastructure.Persistence;
@@ -15,6 +16,7 @@ public sealed class VideoWorkflowHandlers(
     ITranscriptClient transcriptClient,
     ILlmClient llmClient,
     ITelegramPublisher telegramPublisher,
+    IKnowledgeService knowledgeService,
     ILogger<VideoWorkflowHandlers> logger)
 {
     public async Task Handle(DiscoverVideos command, IMessageBus bus, CancellationToken cancellationToken)
@@ -104,7 +106,7 @@ public sealed class VideoWorkflowHandlers(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task Handle(ApproveArticle command, CancellationToken cancellationToken)
+    public async Task Handle(ApproveArticle command, IMessageBus bus, CancellationToken cancellationToken)
     {
         var article = await dbContext.Articles.Include(x => x.Video).FirstOrDefaultAsync(x => x.Id == command.ArticleId, cancellationToken);
         if (article is null || article.Status is ArticleStatus.Approved or ArticleStatus.Published)
@@ -115,6 +117,34 @@ public sealed class VideoWorkflowHandlers(
         article.Approve();
         article.Video?.MarkApproved();
         await dbContext.SaveChangesAsync(cancellationToken);
+        await bus.PublishAsync(new PromoteApprovedArticleToKnowledge(article.Id));
+    }
+
+    public async Task Handle(PromoteApprovedArticleToKnowledge command, CancellationToken cancellationToken)
+    {
+        await knowledgeService.PromoteApprovedArticleAsync(command.ArticleId, cancellationToken);
+    }
+
+    public async Task Handle(RebuildKnowledgeEmbeddings command, CancellationToken cancellationToken)
+    {
+        await knowledgeService.RebuildEmbeddingsAsync(command.BatchSize, cancellationToken);
+    }
+
+    public async Task Handle(ReindexKnowledge command, CancellationToken cancellationToken)
+    {
+        await knowledgeService.PromoteAllApprovedArticlesAsync(cancellationToken);
+        await knowledgeService.RebuildRelatedArticlesAsync(cancellationToken);
+        await knowledgeService.AssignLearningPathsAsync(cancellationToken);
+    }
+
+    public async Task Handle(GenerateWeeklyKnowledgeDigest command, CancellationToken cancellationToken)
+    {
+        await knowledgeService.GenerateWeeklyDigestAsync(command.WeekStart, cancellationToken);
+    }
+
+    public async Task Handle(AnalyzeKnowledgeArticleQuality command, CancellationToken cancellationToken)
+    {
+        await knowledgeService.AnalyzeArticleQualityAsync(command.BatchSize, cancellationToken);
     }
 
     public async Task Handle(PublishArticle command, CancellationToken cancellationToken)

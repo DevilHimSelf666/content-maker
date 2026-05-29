@@ -1,4 +1,6 @@
 using EngineeringDigest.Application.Abstractions;
+using EngineeringDigest.Application.Knowledge;
+using EngineeringDigest.Infrastructure.Knowledge;
 using EngineeringDigest.Infrastructure.Llm;
 using EngineeringDigest.Infrastructure.Persistence;
 using EngineeringDigest.Infrastructure.Telegram;
@@ -18,12 +20,19 @@ public static class ServiceCollectionExtensions
         services.Configure<LlmOptions>(configuration.GetSection("Llm"));
         services.Configure<TranscriptOptions>(configuration.GetSection("Transcript"));
         services.Configure<TelegramOptions>(configuration.GetSection("Telegram"));
+        services.Configure<EmbeddingOptions>(configuration.GetSection("Embedding"));
 
         var connectionString = configuration.GetConnectionString("EngineeringDigest")
             ?? throw new InvalidOperationException("ConnectionStrings:EngineeringDigest is required.");
 
         services.AddDbContext<EngineeringDigestDbContext>(options =>
             options.UseSqlServer(connectionString));
+
+        var knowledgeConnectionString = configuration.GetConnectionString("Knowledge")
+            ?? throw new InvalidOperationException("ConnectionStrings:Knowledge is required.");
+
+        services.AddDbContext<KnowledgeDbContext>(options =>
+            options.UseNpgsql(knowledgeConnectionString));
 
         services.AddScoped<DbInitializer>();
         services.AddHttpClient<IYouTubeRssClient, YouTubeRssClient>();
@@ -37,6 +46,13 @@ public static class ServiceCollectionExtensions
             var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<LlmOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/'));
         });
+        services.AddHttpClient<IEmbeddingProvider, OpenAiCompatibleEmbeddingProvider>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<EmbeddingOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/'));
+        });
+        services.AddScoped<IKnowledgeService, KnowledgeService>();
+        services.AddScoped<IRagService, RagService>();
         services.AddHttpClient<ITelegramPublisher, TelegramPublisher>();
 
         return services;

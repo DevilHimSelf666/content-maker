@@ -1,0 +1,48 @@
+@page "/knowledge"
+@rendermode InteractiveServer
+@inject IKnowledgeService KnowledgeService
+@inject KnowledgeDbContext KnowledgeDb
+
+<h1>Knowledge Search</h1>
+<section class="card search-panel">
+    <input placeholder="Search internal engineering articles..." @bind="query" />
+    <label><input type="checkbox" @bind="semantic" /> Semantic search</label>
+    <select @bind="categoryIdText">
+        <option value="">All categories</option>
+        @foreach (var category in categories)
+        {
+            <option value="@category.Id">@category.Name</option>
+        }
+    </select>
+    <button @onclick="SearchAsync">Search</button>
+</section>
+
+@foreach (var result in results)
+{
+    <article class="card">
+        <h2><a href="/knowledge/articles/@result.Id">@result.Title</a></h2>
+        <p><span class="badge">@result.Category</span> · relevance @result.RelevanceScore.ToString("0.00") · @result.ViewCount views</p>
+        <p>@result.Summary</p>
+        <p>@string.Join(", ", result.Tags)</p>
+    </article>
+}
+
+@code {
+    private string? query;
+    private bool semantic = true;
+    private string? categoryIdText;
+    private List<EngineeringDigest.Domain.Knowledge.KnowledgeCategory> categories = [];
+    private IReadOnlyList<KnowledgeSearchResult> results = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await KnowledgeDb.KnowledgeCategories.AsNoTracking().OrderBy(x => x.Name).ToListAsync();
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        var categoryId = Guid.TryParse(categoryIdText, out var parsed) ? parsed : null as Guid?;
+        results = await KnowledgeService.SearchAsync(new KnowledgeSearchRequest(query, semantic, categoryId, [], 25), CancellationToken.None);
+    }
+}

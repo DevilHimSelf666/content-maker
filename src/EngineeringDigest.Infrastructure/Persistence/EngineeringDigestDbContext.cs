@@ -12,7 +12,7 @@ public sealed class EngineeringDigestDbContext(DbContextOptions<EngineeringDiges
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EngineeringDigestDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EngineeringDigestDbContext).Assembly, type => type.Namespace is null || !type.Namespace.Contains(".Knowledge", StringComparison.Ordinal));
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
