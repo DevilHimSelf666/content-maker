@@ -1,0 +1,51 @@
+@page "/knowledge/analytics"
+@rendermode InteractiveServer
+@inject KnowledgeDbContext Db
+
+<h1>Knowledge Analytics</h1>
+<section class="card">
+    <h2>Search Frequency</h2>
+    @foreach (var item in searchFrequency)
+    {
+        <p>@item.Query · @item.Count searches</p>
+    }
+</section>
+<section class="card">
+    <h2>Most Viewed Articles</h2>
+    @foreach (var article in mostViewed)
+    {
+        <p><a href="/knowledge/articles/@article.Id">@article.Title</a> · @article.ViewCount views · @article.UsefulCount useful</p>
+    }
+</section>
+<section class="card">
+    <h2>Topic Popularity</h2>
+    @foreach (var topic in topicPopularity)
+    {
+        <p>@topic.Category · @topic.Count articles</p>
+    }
+</section>
+
+@code {
+    private List<SearchRow> searchFrequency = [];
+    private List<EngineeringDigest.Domain.Knowledge.KnowledgeArticle> mostViewed = [];
+    private List<TopicRow> topicPopularity = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        searchFrequency = await Db.KnowledgeSearchLogs.AsNoTracking()
+            .GroupBy(x => x.Query)
+            .Select(x => new SearchRow(x.Key, x.Count()))
+            .OrderByDescending(x => x.Count)
+            .Take(20)
+            .ToListAsync();
+        mostViewed = await Db.KnowledgeArticles.AsNoTracking().OrderByDescending(x => x.ViewCount).Take(20).ToListAsync();
+        topicPopularity = await Db.KnowledgeArticles.AsNoTracking()
+            .GroupBy(x => x.Category!.Name)
+            .Select(x => new TopicRow(x.Key, x.Count()))
+            .OrderByDescending(x => x.Count)
+            .ToListAsync();
+    }
+
+    private sealed record SearchRow(string Query, int Count);
+    private sealed record TopicRow(string Category, int Count);
+}

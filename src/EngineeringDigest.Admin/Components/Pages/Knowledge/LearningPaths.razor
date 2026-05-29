@@ -1,0 +1,28 @@
+@page "/knowledge/learning-paths"
+@rendermode InteractiveServer
+@inject KnowledgeDbContext Db
+
+<h1>Learning Paths</h1>
+@foreach (var path in paths)
+{
+    <section class="card">
+        <h2>@path.Name</h2>
+        <p>@path.Description</p>
+        @foreach (var item in path.Articles.OrderBy(x => x.Order))
+        {
+            <p>@(item.Order). <a href="/knowledge/articles/@item.KnowledgeArticleId">@item.KnowledgeArticle?.Title</a></p>
+        }
+    </section>
+}
+
+@code {
+    private List<EngineeringDigest.Domain.Knowledge.LearningPath> paths = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        paths = await Db.LearningPaths.AsNoTracking()
+            .Include(x => x.Articles).ThenInclude(x => x.KnowledgeArticle)
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+    }
+}

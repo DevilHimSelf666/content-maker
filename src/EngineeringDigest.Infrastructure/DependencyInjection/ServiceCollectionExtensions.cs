@@ -24,12 +24,19 @@ public static class ServiceCollectionExtensions
         services.Configure<LlmOptions>(configuration.GetSection("Llm"));
         services.Configure<TranscriptOptions>(configuration.GetSection("Transcript"));
         services.Configure<TelegramOptions>(configuration.GetSection("Telegram"));
+        services.Configure<EmbeddingOptions>(configuration.GetSection("Embedding"));
 
         var connectionString = configuration.GetConnectionString("EngineeringDigest")
             ?? throw new InvalidOperationException("ConnectionStrings:EngineeringDigest is required.");
 
         services.AddDbContext<EngineeringDigestDbContext>(options =>
             options.UseSqlServer(connectionString));
+
+        var knowledgeConnectionString = configuration.GetConnectionString("Knowledge")
+            ?? throw new InvalidOperationException("ConnectionStrings:Knowledge is required.");
+
+        services.AddDbContext<KnowledgeDbContext>(options =>
+            options.UseNpgsql(knowledgeConnectionString));
 
         services.AddScoped<DbInitializer>();
         services.AddSingleton<EngineeringDigestMetrics>();

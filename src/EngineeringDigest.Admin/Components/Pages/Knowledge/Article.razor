@@ -1,0 +1,51 @@
+@page "/knowledge/articles/{Id:guid}"
+@rendermode InteractiveServer
+@inject KnowledgeDbContext Db
+
+@if (article is null)
+{
+    <p>Article not found.</p>
+}
+else
+{
+    <article class="card article-page">
+        <h1>@article.Title</h1>
+        <p><span class="badge">@article.Category?.Name</span> · version @article.Version · @article.ViewCount views</p>
+        <p>@article.Summary</p>
+        <pre>@article.BodyMarkdown</pre>
+    </article>
+
+    <section class="card">
+        <h2>Article History</h2>
+        <p>Created @article.CreatedAt.UtcDateTime.ToString("u") · Updated @(article.UpdatedAt?.UtcDateTime.ToString("u") ?? "not updated")</p>
+        <p>Quality: depth @Score(article.QualityTechnicalDepth), clarity @Score(article.QualityClarity), relevance @Score(article.QualityRelevance), practical @Score(article.QualityPracticalValue)</p>
+    </section>
+
+    <section class="card">
+        <h2>Related Articles</h2>
+        @foreach (var relation in article.RelatedArticles.OrderByDescending(x => x.Score))
+        {
+            <p><a href="/knowledge/articles/@relation.RelatedArticleId">@relation.RelatedArticle?.Title</a> · @relation.Score.ToString("0.00") · @relation.Reason</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private EngineeringDigest.Domain.Knowledge.KnowledgeArticle? article;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        article = await Db.KnowledgeArticles
+            .Include(x => x.Category)
+            .Include(x => x.RelatedArticles).ThenInclude(x => x.RelatedArticle)
+            .FirstOrDefaultAsync(x => x.Id == Id);
+        if (article is not null)
+        {
+            article.ViewCount++;
+            await Db.SaveChangesAsync();
+        }
+    }
+
+    private static string Score(decimal? value) => value?.ToString("0.00") ?? "n/a";
+}

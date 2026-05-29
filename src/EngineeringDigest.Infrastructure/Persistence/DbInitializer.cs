@@ -14,12 +14,14 @@ public sealed class SeedOptions
 
 public sealed class DbInitializer(
     EngineeringDigestDbContext dbContext,
+    KnowledgeDbContext knowledgeDbContext,
     IOptions<SeedOptions> seedOptions,
     ILogger<DbInitializer> logger)
 {
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         await dbContext.Database.MigrateAsync(cancellationToken);
+        await knowledgeDbContext.Database.MigrateAsync(cancellationToken);
 
         foreach (var channel in seedOptions.Value.Channels)
         {

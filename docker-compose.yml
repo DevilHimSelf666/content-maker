@@ -14,6 +14,22 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: EngineeringDigestKnowledge
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Your_password123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d EngineeringDigestKnowledge"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   transcript-service:
     build: ./transcript-service
     ports:
@@ -26,14 +42,21 @@ services:
     depends_on:
       sqlserver:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
       transcript-service:
         condition: service_started
     environment:
       ConnectionStrings__EngineeringDigest: Server=sqlserver,1433;Database=EngineeringDigest;User Id=sa;Password=${SQL_PASSWORD:-Your_password123};TrustServerCertificate=True
+      ConnectionStrings__Knowledge: Host=postgres;Port=5432;Database=EngineeringDigestKnowledge;Username=postgres;Password=${POSTGRES_PASSWORD:-Your_password123}
       Transcript__BaseUrl: http://transcript-service:8081
       Llm__BaseUrl: ${LLM_BASE_URL:-https://api.openai.com/v1}
       Llm__ApiKey: ${LLM_API_KEY:-}
       Llm__Model: ${LLM_MODEL:-}
+      Embedding__BaseUrl: ${EMBEDDING_BASE_URL:-https://api.openai.com/v1}
+      Embedding__ApiKey: ${EMBEDDING_API_KEY:-}
+      Embedding__Model: ${EMBEDDING_MODEL:-}
+      Embedding__Dimensions: ${EMBEDDING_DIMENSIONS:-1536}
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
       Telegram__ChatId: ${TELEGRAM_CHAT_ID:-}
 
@@ -44,17 +67,25 @@ services:
     depends_on:
       sqlserver:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__EngineeringDigest: Server=sqlserver,1433;Database=EngineeringDigest;User Id=sa;Password=${SQL_PASSWORD:-Your_password123};TrustServerCertificate=True
+      ConnectionStrings__Knowledge: Host=postgres;Port=5432;Database=EngineeringDigestKnowledge;Username=postgres;Password=${POSTGRES_PASSWORD:-Your_password123}
       Transcript__BaseUrl: http://transcript-service:8081
       Llm__BaseUrl: ${LLM_BASE_URL:-https://api.openai.com/v1}
       Llm__ApiKey: ${LLM_API_KEY:-}
       Llm__Model: ${LLM_MODEL:-}
+      Embedding__BaseUrl: ${EMBEDDING_BASE_URL:-https://api.openai.com/v1}
+      Embedding__ApiKey: ${EMBEDDING_API_KEY:-}
+      Embedding__Model: ${EMBEDDING_MODEL:-}
+      Embedding__Dimensions: ${EMBEDDING_DIMENSIONS:-1536}
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
       Telegram__ChatId: ${TELEGRAM_CHAT_ID:-}
 
 volumes:
   sqlserver-data:
+  postgres-data:

@@ -1,0 +1,33 @@
+@page "/knowledge/ask"
+@rendermode InteractiveServer
+@inject IRagService RagService
+
+<h1>Ask Knowledge Base</h1>
+<section class="card search-panel">
+    <textarea rows="4" placeholder="Ask a question about internal engineering articles..." @bind="question"></textarea>
+    <button @onclick="AskAsync">Ask</button>
+</section>
+
+@if (answer is not null)
+{
+    <section class="card">
+        <h2>Answer</h2>
+        <p>Confidence @answer.ConfidenceScore.ToString("0.00")</p>
+        <pre>@answer.AnswerMarkdown</pre>
+        <h3>Sources</h3>
+        @foreach (var source in answer.Sources)
+        {
+            <p><a href="/knowledge/articles/@source.ArticleId">@source.Title</a> · @source.RelevanceScore.ToString("0.00")</p>
+        }
+    </section>
+}
+
+@code {
+    private string question = string.Empty;
+    private RagAnswer? answer;
+
+    private async Task AskAsync()
+    {
+        answer = await RagService.AnswerAsync(question, CancellationToken.None);
+    }
+}
